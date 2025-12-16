@@ -2,34 +2,59 @@ import { promises as fs } from 'fs'
 import path from 'path'
 
 export type DataRecord = {
+  // Non-numeric identifiers
   country: string
   year: number | null
-  urbanPopPerc: number | null
-  agValueAdded: number | null
-  renEnergyConsPerc: number | null
-  cleanCookingAccess: number | null
   clusterLabel: string
+  
+  // ALL 53 numeric indicators from CSV (matching cluster_countries.py)
+  totalPop: number | null
+  popDensSqKm: number | null
+  urbanPopPerc: number | null
+  ruralPopPerc: number | null
+  electAccessPop: number | null
+  renEnergyConsPerc: number | null
+  cleanFuelTechCookPop: number | null
+  co2EmissExclLulucf: number | null
   giniCoefficient: number | null
   perceptionsOfCriminality: number | null
   homicideRate: number | null
-  violentCrime: number | null
-  violentDemonstrations: number | null
+  policeRate: number | null
+  incarcerationRate: number | null
   accessToSmallArms: number | null
-  safetyAndSecurity: number | null
-  totalPop: number | null
-  carbonDamage: number | null
-  gdp: number | null
-  popDensSqKm: number | null
-  overallScore: number | null
-  militarisation: number | null
-  politicalInstability: number | null
-  internalPeace: number | null
-  weaponsExports: number | null
-  weaponsImports: number | null
-  nuclearHeavyWeapons: number | null
-  ongoingConflict: number | null
-  neighbouringCountriesRelations: number | null
   intensityOfInternalConflict: number | null
+  violentDemonstrations: number | null
+  violentCrime: number | null
+  politicalInstability: number | null
+  politicalTerrorScale: number | null
+  weaponsImports: number | null
+  terrorismImpact: number | null
+  deathsFromInternalConflict: number | null
+  internalConflictsFought: number | null
+  militaryExpenditurePercGdp: number | null
+  armedServicesPersonnelRate: number | null
+  unPeacekeepingFunding: number | null
+  nuclearHeavyWeapons: number | null
+  weaponsExports: number | null
+  refugeesAndIdps: number | null
+  neighbouringCountriesRelations: number | null
+  externalConflictsFought: number | null
+  deathsFromExternalConflict: number | null
+  overallScore: number | null
+  internalPeace: number | null
+  externalPeace: number | null
+  safetyAndSecurity: number | null
+  ongoingConflict: number | null
+  militarisation: number | null
+  agValueAdded: number | null
+  adjSavingsNaturalResourcesDepletion: number | null
+  adjSavingsNetForestDepletion: number | null
+  accessToElectricity: number | null
+  adjSavingsEnergyDepletion: number | null
+  carbonDamage: number | null
+  cleanCookingAccess: number | null
+  agValueAddedGrowth: number | null
+  gdp: number | null
 }
 
 const CANDIDATE_PATHS = [
@@ -113,99 +138,59 @@ function normalizeRecord(row: Record<string, string>): DataRecord {
   }
 
   return {
+    // Non-numeric identifiers
     country: getValue(row, 'Country', 'country') || '',
     year: toNumber(getValue(row, 'Year', 'year')),
-    urbanPopPerc: toNumber(getValue(row, 'urban_pop_perc', 'urban_pop_percentage', 'urban_pop_%')),
-    agValueAdded: toNumber(
-      getValue(
-        row,
-        'Agriculture, forestry, and fishing, value added (% of GDP)',
-        'ag_value_added',
-        'Agriculture forestry and fishing value added (% of GDP)'
-      )
-    ),
-    renEnergyConsPerc: toNumber(
-      getValue(row, 'ren_energy_cons_perc', 'ren_energy_percentage', 'ren_energy_cons_%')
-    ),
-    cleanCookingAccess: toNumber(
-      getValue(
-        row,
-        'clean_fuel_tech_cook_pop',
-        'clean_cooking_access',
-        'Access to clean fuels and technologies for cooking (% of population)'
-      )
-    ),
-    giniCoefficient: toNumber(
-      getValue(
-        row,
-        'Gini coefficient (2021 prices)',
-        'gini_coef',
-        'gini_coefficient',
-        'Gini coefficient'
-      )
-    ),
-    perceptionsOfCriminality: toNumber(
-      getValue(row, 'perceptions of criminality', 'perceptions_of_criminality', 'perceptions_crime')
-    ),
-    homicideRate: toNumber(getValue(row, 'homicide rate', 'homicide_rate')),
-    violentCrime: toNumber(getValue(row, 'Violent crime', 'violent_crime')),
-    violentDemonstrations: toNumber(
-      getValue(row, 'violent demonstrations', 'violent_demonstrations')
-    ),
-    accessToSmallArms: toNumber(
-      getValue(row, 'Access to small arms', 'access_to_small_arms', 'Access to small arms')
-    ),
-    safetyAndSecurity: toNumber(
-      getValue(row, 'safety and security', 'safety_and_security', 'safety & security')
-    ),
-    totalPop: toNumber(
-      getValue(row, 'total_pop', 'total_population', 'total population')
-    ),
-    carbonDamage: toNumber(
-      getValue(
-        row,
-        'Adjusted savings: carbon dioxide damage (% of GNI)',
-        'carbon_damage',
-        'carbon_dioxide_damage'
-      )
-    ),
-    gdp: toNumber(
-      getValue(row, 'gdp', 'GDP', 'gdp_usd')
-    ),
-    popDensSqKm: toNumber(
-      getValue(row, 'pop_dens_sq_km', 'pop_dens_sq_km', 'population_density')
-    ),
-    overallScore: toNumber(
-      getValue(row, 'overall score', 'overall_score', 'Overall Score')
-    ),
-    militarisation: toNumber(
-      getValue(row, 'militarisation', 'militarization', 'militarisation')
-    ),
-    politicalInstability: toNumber(
-      getValue(row, 'Political instability', 'political_instability', 'Political Instability')
-    ),
-    internalPeace: toNumber(
-      getValue(row, 'internal peace', 'internal_peace', 'Internal Peace')
-    ),
-    weaponsExports: toNumber(
-      getValue(row, 'weapons exports', 'weapons_exports', 'weapons exports')
-    ),
-    weaponsImports: toNumber(
-      getValue(row, 'weapons imports', 'weapons_imports', 'weapons imports')
-    ),
-    nuclearHeavyWeapons: toNumber(
-      getValue(row, 'nuclear and heavy weapons', 'nuclear_heavy_weapons', 'nuclear and heavy weapons')
-    ),
-    ongoingConflict: toNumber(
-      getValue(row, 'ongoing conflict', 'ongoing_conflict', 'ongoing conflict')
-    ),
-    neighbouringCountriesRelations: toNumber(
-      getValue(row, 'Neighbouring countries relations', 'neighbouring_countries_relations', 'Neighbouring countries relations')
-    ),
-    intensityOfInternalConflict: toNumber(
-      getValue(row, 'intensity of internal conflict', 'intensity_of_internal_conflict', 'intensity of internal conflict')
-    ),
     clusterLabel,
+    
+    // ALL 53 numeric indicators from CSV
+    totalPop: toNumber(getValue(row, 'total_pop')),
+    popDensSqKm: toNumber(getValue(row, 'pop_dens_sq_km')),
+    urbanPopPerc: toNumber(getValue(row, 'urban_pop_perc')),
+    ruralPopPerc: toNumber(getValue(row, 'rural_pop_perc')),
+    electAccessPop: toNumber(getValue(row, 'elect_access_pop')),
+    renEnergyConsPerc: toNumber(getValue(row, 'ren_energy_cons_perc')),
+    cleanFuelTechCookPop: toNumber(getValue(row, 'clean_fuel_tech_cook_pop')),
+    co2EmissExclLulucf: toNumber(getValue(row, 'co2_emiss_excl_lulucf')),
+    giniCoefficient: toNumber(getValue(row, 'Gini coefficient (2021 prices)')),
+    perceptionsOfCriminality: toNumber(getValue(row, 'perceptions of criminality')),
+    homicideRate: toNumber(getValue(row, 'homicide rate')),
+    policeRate: toNumber(getValue(row, 'police rate')),
+    incarcerationRate: toNumber(getValue(row, 'incarceration rate')),
+    accessToSmallArms: toNumber(getValue(row, 'Access to small arms')),
+    intensityOfInternalConflict: toNumber(getValue(row, 'intensity of internal conflict')),
+    violentDemonstrations: toNumber(getValue(row, 'violent demonstrations')),
+    violentCrime: toNumber(getValue(row, 'Violent crime')),
+    politicalInstability: toNumber(getValue(row, 'Political instability')),
+    politicalTerrorScale: toNumber(getValue(row, 'Political Terror Scale')),
+    weaponsImports: toNumber(getValue(row, 'weapons imports')),
+    terrorismImpact: toNumber(getValue(row, 'terrorism impact')),
+    deathsFromInternalConflict: toNumber(getValue(row, 'deaths from internal conflict')),
+    internalConflictsFought: toNumber(getValue(row, 'internal conflicts fought')),
+    militaryExpenditurePercGdp: toNumber(getValue(row, 'military expenditure (% gdp)')),
+    armedServicesPersonnelRate: toNumber(getValue(row, 'armed services personnel rate')),
+    unPeacekeepingFunding: toNumber(getValue(row, 'un peacekeeping funding')),
+    nuclearHeavyWeapons: toNumber(getValue(row, 'nuclear and heavy weapons')),
+    weaponsExports: toNumber(getValue(row, 'weapons exports')),
+    refugeesAndIdps: toNumber(getValue(row, 'refugees and idps')),
+    neighbouringCountriesRelations: toNumber(getValue(row, 'Neighbouring countries relations')),
+    externalConflictsFought: toNumber(getValue(row, 'external conflicts fought')),
+    deathsFromExternalConflict: toNumber(getValue(row, 'deaths From external conflict')),
+    overallScore: toNumber(getValue(row, 'overall score')),
+    internalPeace: toNumber(getValue(row, 'internal peace')),
+    externalPeace: toNumber(getValue(row, 'external peace')),
+    safetyAndSecurity: toNumber(getValue(row, 'safety and security')),
+    ongoingConflict: toNumber(getValue(row, 'ongoing conflict')),
+    militarisation: toNumber(getValue(row, 'militarisation')),
+    agValueAdded: toNumber(getValue(row, 'Agriculture, forestry, and fishing, value added (% of GDP)')),
+    adjSavingsNaturalResourcesDepletion: toNumber(getValue(row, 'Adjusted savings: natural resources depletion (% of GNI)')),
+    adjSavingsNetForestDepletion: toNumber(getValue(row, 'Adjusted savings: net forest depletion (% of GNI)')),
+    accessToElectricity: toNumber(getValue(row, 'Access to electricity (% of population)')),
+    adjSavingsEnergyDepletion: toNumber(getValue(row, 'Adjusted savings: energy depletion (% of GNI)')),
+    carbonDamage: toNumber(getValue(row, 'Adjusted savings: carbon dioxide damage (% of GNI)')),
+    cleanCookingAccess: toNumber(getValue(row, 'Access to clean fuels and technologies for cooking (% of population)')),
+    agValueAddedGrowth: toNumber(getValue(row, 'Agriculture, forestry, and fishing, value added (annual % growth)')),
+    gdp: toNumber(getValue(row, 'gdp')),
   }
 }
 

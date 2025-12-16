@@ -30,12 +30,64 @@ export interface CountryProfile {
   clusterLabel: 'Stable Urbanizers' | 'Volatile Urbanizers'
 }
 
-// Simple K-Means implementation
-function kMeans(data: number[][], k: number, maxIterations: number = 10): number[] {
+// Get all numeric field keys from DataRecord (excluding year and clusterLabel)
+const ALL_NUMERIC_FIELDS: (keyof DataRecord)[] = [
+  'totalPop',
+  'popDensSqKm',
+  'urbanPopPerc',
+  'ruralPopPerc',
+  'electAccessPop',
+  'renEnergyConsPerc',
+  'cleanFuelTechCookPop',
+  'co2EmissExclLulucf',
+  'giniCoefficient',
+  'perceptionsOfCriminality',
+  'homicideRate',
+  'policeRate',
+  'incarcerationRate',
+  'accessToSmallArms',
+  'intensityOfInternalConflict',
+  'violentDemonstrations',
+  'violentCrime',
+  'politicalInstability',
+  'politicalTerrorScale',
+  'weaponsImports',
+  'terrorismImpact',
+  'deathsFromInternalConflict',
+  'internalConflictsFought',
+  'militaryExpenditurePercGdp',
+  'armedServicesPersonnelRate',
+  'unPeacekeepingFunding',
+  'nuclearHeavyWeapons',
+  'weaponsExports',
+  'refugeesAndIdps',
+  'neighbouringCountriesRelations',
+  'externalConflictsFought',
+  'deathsFromExternalConflict',
+  'overallScore',
+  'internalPeace',
+  'externalPeace',
+  'safetyAndSecurity',
+  'ongoingConflict',
+  'militarisation',
+  'agValueAdded',
+  'adjSavingsNaturalResourcesDepletion',
+  'adjSavingsNetForestDepletion',
+  'accessToElectricity',
+  'adjSavingsEnergyDepletion',
+  'carbonDamage',
+  'cleanCookingAccess',
+  'agValueAddedGrowth',
+  'gdp',
+]
+
+// Simple K-Means implementation (matching Python: n_clusters=2, random_state=42, n_init=10, max_iter=300)
+function kMeans(data: number[][], k: number, maxIterations: number = 300): number[] {
   const n = data.length
   const m = data[0].length
   
   // Initialize centroids deterministically (use first k points, evenly spaced)
+  // This mimics random_state=42 for reproducibility
   let centroids: number[][] = []
   if (n <= k) {
     // If we have fewer points than clusters, use all points
@@ -50,6 +102,7 @@ function kMeans(data: number[][], k: number, maxIterations: number = 10): number
   }
   
   let clusters = new Array(n).fill(0)
+  let prevClusters = new Array(n).fill(-1)
   
   for (let iter = 0; iter < maxIterations; iter++) {
     // Assign points to nearest centroid
@@ -72,6 +125,12 @@ function kMeans(data: number[][], k: number, maxIterations: number = 10): number
       clusters[i] = bestCluster
     }
     
+    // Check for convergence
+    if (clusters.every((c, i) => c === prevClusters[i])) {
+      break
+    }
+    prevClusters = [...clusters]
+    
     // Update centroids
     for (let c = 0; c < k; c++) {
       const clusterPoints = data.filter((_, i) => clusters[i] === c)
@@ -88,177 +147,92 @@ function kMeans(data: number[][], k: number, maxIterations: number = 10): number
 
 // Perform clustering on country profiles
 export function clusterCountries(data: DataRecord[]): Map<string, CountryProfile> {
-  // Group by country and calculate averages
-  const countryMap = new Map<string, {
-    counts: number
-    urbanPopPerc: number[]
-    giniCoefficient: number[]
-    overallScore: number[]
-    homicideRate: number[]
-    militarisation: number[]
-    politicalInstability: number[]
-    internalPeace: number[]
-    weaponsExports: number[]
-    weaponsImports: number[]
-    nuclearHeavyWeapons: number[]
-    ongoingConflict: number[]
-    neighbouringCountriesRelations: number[]
-    intensityOfInternalConflict: number[]
-    agValueAdded: number[]
-    renEnergyConsPerc: number[]
-    cleanCookingAccess: number[]
-    perceptionsOfCriminality: number[]
-    violentCrime: number[]
-    violentDemonstrations: number[]
-    accessToSmallArms: number[]
-    safetyAndSecurity: number[]
-    totalPop: number[]
-    carbonDamage: number[]
-    gdp: number[]
-    popDensSqKm: number[]
-  }>()
+  // Group by country and calculate averages for ALL numeric fields
+  type CountryAggregation = Record<keyof DataRecord, number[]> & { counts: number }
+  const countryMap = new Map<string, Partial<CountryAggregation>>()
 
   data.forEach((d) => {
     if (!d.country || d.country.trim() === '') return
     
     if (!countryMap.has(d.country)) {
-      countryMap.set(d.country, {
-        counts: 0,
-        urbanPopPerc: [],
-        giniCoefficient: [],
-        overallScore: [],
-        homicideRate: [],
-        militarisation: [],
-        politicalInstability: [],
-        internalPeace: [],
-        weaponsExports: [],
-        weaponsImports: [],
-        nuclearHeavyWeapons: [],
-        ongoingConflict: [],
-        neighbouringCountriesRelations: [],
-        intensityOfInternalConflict: [],
-        agValueAdded: [],
-        renEnergyConsPerc: [],
-        cleanCookingAccess: [],
-        perceptionsOfCriminality: [],
-        violentCrime: [],
-        violentDemonstrations: [],
-        accessToSmallArms: [],
-        safetyAndSecurity: [],
-        totalPop: [],
-        carbonDamage: [],
-        gdp: [],
-        popDensSqKm: [],
+      const entry: Partial<CountryAggregation> = { counts: 0 }
+      ALL_NUMERIC_FIELDS.forEach(field => {
+        entry[field] = []
       })
+      countryMap.set(d.country, entry)
     }
     
     const entry = countryMap.get(d.country)!
-    entry.counts++
-    if (d.urbanPopPerc != null) entry.urbanPopPerc.push(d.urbanPopPerc)
-    if (d.giniCoefficient != null) entry.giniCoefficient.push(d.giniCoefficient)
-    if (d.overallScore != null) entry.overallScore.push(d.overallScore)
-    if (d.homicideRate != null) entry.homicideRate.push(d.homicideRate)
-    if (d.militarisation != null) entry.militarisation.push(d.militarisation)
-    if (d.politicalInstability != null) entry.politicalInstability.push(d.politicalInstability)
-    if (d.internalPeace != null) entry.internalPeace.push(d.internalPeace)
-    if (d.weaponsExports != null) entry.weaponsExports.push(d.weaponsExports)
-    if (d.weaponsImports != null) entry.weaponsImports.push(d.weaponsImports)
-    if (d.nuclearHeavyWeapons != null) entry.nuclearHeavyWeapons.push(d.nuclearHeavyWeapons)
-    if (d.ongoingConflict != null) entry.ongoingConflict.push(d.ongoingConflict)
-    if (d.neighbouringCountriesRelations != null) entry.neighbouringCountriesRelations.push(d.neighbouringCountriesRelations)
-    if (d.intensityOfInternalConflict != null) entry.intensityOfInternalConflict.push(d.intensityOfInternalConflict)
-    if (d.agValueAdded != null) entry.agValueAdded.push(d.agValueAdded)
-    if (d.renEnergyConsPerc != null) entry.renEnergyConsPerc.push(d.renEnergyConsPerc)
-    if (d.cleanCookingAccess != null) entry.cleanCookingAccess.push(d.cleanCookingAccess)
-    if (d.perceptionsOfCriminality != null) entry.perceptionsOfCriminality.push(d.perceptionsOfCriminality)
-    if (d.violentCrime != null) entry.violentCrime.push(d.violentCrime)
-    if (d.violentDemonstrations != null) entry.violentDemonstrations.push(d.violentDemonstrations)
-    if (d.accessToSmallArms != null) entry.accessToSmallArms.push(d.accessToSmallArms)
-    if (d.safetyAndSecurity != null) entry.safetyAndSecurity.push(d.safetyAndSecurity)
-    if (d.totalPop != null) entry.totalPop.push(d.totalPop)
-    if (d.carbonDamage != null) entry.carbonDamage.push(d.carbonDamage)
-    if (d.gdp != null) entry.gdp.push(d.gdp)
-    if (d.popDensSqKm != null) entry.popDensSqKm.push(d.popDensSqKm)
+    entry.counts = (entry.counts || 0) + 1
+    
+    // Add all numeric values to the aggregation arrays
+    ALL_NUMERIC_FIELDS.forEach(field => {
+      if (d[field] != null) {
+        (entry[field] as number[]).push(d[field] as number)
+      }
+    })
   })
 
-  // Create profiles with complete data
+  // Create profiles with averaged data (matching Python's groupby.mean())
   const profiles: (CountryProfile & { features: number[] })[] = []
+  const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
   
   countryMap.forEach((entry, country) => {
-    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
+    // Calculate means for all fields
+    const allMeans: Record<string, number> = {}
+    ALL_NUMERIC_FIELDS.forEach(field => {
+      allMeans[field] = avg(entry[field] as number[] || [])
+    })
     
-    const profileValues = {
+    // Create CountryProfile with the subset of fields we track
+    const profileValues: CountryProfile = {
       country,
-      urbanPopPerc: avg(entry.urbanPopPerc),
-      giniCoefficient: avg(entry.giniCoefficient),
-      overallScore: avg(entry.overallScore),
-      homicideRate: avg(entry.homicideRate),
-      militarisation: avg(entry.militarisation),
-      politicalInstability: avg(entry.politicalInstability),
-      internalPeace: avg(entry.internalPeace),
-      weaponsExports: avg(entry.weaponsExports),
-      weaponsImports: avg(entry.weaponsImports),
-      nuclearHeavyWeapons: avg(entry.nuclearHeavyWeapons),
-      ongoingConflict: avg(entry.ongoingConflict),
-      neighbouringCountriesRelations: avg(entry.neighbouringCountriesRelations),
-      intensityOfInternalConflict: avg(entry.intensityOfInternalConflict),
-      agValueAdded: avg(entry.agValueAdded),
-      renEnergyConsPerc: avg(entry.renEnergyConsPerc),
-      cleanCookingAccess: avg(entry.cleanCookingAccess),
-      perceptionsOfCriminality: avg(entry.perceptionsOfCriminality),
-      violentCrime: avg(entry.violentCrime),
-      violentDemonstrations: avg(entry.violentDemonstrations),
-      accessToSmallArms: avg(entry.accessToSmallArms),
-      safetyAndSecurity: avg(entry.safetyAndSecurity),
-      totalPop: avg(entry.totalPop),
-      carbonDamage: avg(entry.carbonDamage),
-      gdp: avg(entry.gdp),
-      popDensSqKm: avg(entry.popDensSqKm),
+      urbanPopPerc: allMeans.urbanPopPerc || 0,
+      giniCoefficient: allMeans.giniCoefficient || 0,
+      overallScore: allMeans.overallScore || 0,
+      homicideRate: allMeans.homicideRate || 0,
+      militarisation: allMeans.militarisation || 0,
+      politicalInstability: allMeans.politicalInstability || 0,
+      internalPeace: allMeans.internalPeace || 0,
+      weaponsExports: allMeans.weaponsExports || 0,
+      weaponsImports: allMeans.weaponsImports || 0,
+      nuclearHeavyWeapons: allMeans.nuclearHeavyWeapons || 0,
+      ongoingConflict: allMeans.ongoingConflict || 0,
+      neighbouringCountriesRelations: allMeans.neighbouringCountriesRelations || 0,
+      intensityOfInternalConflict: allMeans.intensityOfInternalConflict || 0,
+      agValueAdded: allMeans.agValueAdded || 0,
+      renEnergyConsPerc: allMeans.renEnergyConsPerc || 0,
+      cleanCookingAccess: allMeans.cleanCookingAccess || 0,
+      perceptionsOfCriminality: allMeans.perceptionsOfCriminality || 0,
+      violentCrime: allMeans.violentCrime || 0,
+      violentDemonstrations: allMeans.violentDemonstrations || 0,
+      accessToSmallArms: allMeans.accessToSmallArms || 0,
+      safetyAndSecurity: allMeans.safetyAndSecurity || 0,
+      totalPop: allMeans.totalPop || 0,
+      carbonDamage: allMeans.carbonDamage || 0,
+      gdp: allMeans.gdp || 0,
+      popDensSqKm: allMeans.popDensSqKm || 0,
+      clusterLabel: 'Stable Urbanizers',
     }
     
-    // Build feature vector with ALL numeric indicators (excluding country name)
-    const features: number[] = [
-      profileValues.urbanPopPerc,
-      profileValues.giniCoefficient,
-      profileValues.overallScore,
-      profileValues.homicideRate,
-      profileValues.militarisation,
-      profileValues.politicalInstability,
-      profileValues.internalPeace,
-      profileValues.weaponsExports,
-      profileValues.weaponsImports,
-      profileValues.nuclearHeavyWeapons,
-      profileValues.ongoingConflict,
-      profileValues.neighbouringCountriesRelations,
-      profileValues.intensityOfInternalConflict,
-      profileValues.agValueAdded,
-      profileValues.renEnergyConsPerc,
-      profileValues.cleanCookingAccess,
-      profileValues.perceptionsOfCriminality,
-      profileValues.violentCrime,
-      profileValues.violentDemonstrations,
-      profileValues.accessToSmallArms,
-      profileValues.safetyAndSecurity,
-      profileValues.totalPop,
-      profileValues.carbonDamage,
-      profileValues.gdp,
-      profileValues.popDensSqKm,
-    ]                                           
+    // Build feature vector with ALL 53 numeric indicators (matching Python)
+    // Python: df.select_dtypes(include=[np.number]).columns (excludes Country, Country_Code, Year)
+    const features: number[] = ALL_NUMERIC_FIELDS.map(field => allMeans[field] || 0)
     
-    // Only include countries with ALL features available (dropna equivalent)
-    if (features.every(f => f != null && !isNaN(f) && isFinite(f))) {
-      const profile = {
+    // Include all countries (Python doesn't filter)
+    if (features.some(f => f != null && !isNaN(f) && isFinite(f))) {
+      profiles.push({
         ...profileValues,
-        clusterLabel: 'Stable Urbanizers' as const,
         features,
-      }
-      profiles.push(profile)
+      })
     }
   })
 
   if (profiles.length === 0) {
     return new Map()
   }
+
+  console.log(`Clustering ${profiles.length} countries using ${ALL_NUMERIC_FIELDS.length} indicators`)
 
   // Extract features for clustering
   const features = profiles.map(p => p.features)
@@ -269,37 +243,60 @@ export function clusterCountries(data: DataRecord[]): Map<string, CountryProfile
   
   const numFeatures = features[0].length
   
-  // Normalize features (StandardScaler) - use ALL features
+  // Handle missing values by replacing NaN/null with 0 (simple approach)
+  // Python version doesn't explicitly handle NaN in the clustering step
+  const cleanedFeatures = features.map(f => f.map(v => 
+    (v != null && !isNaN(v) && isFinite(v)) ? v : 0
+  ))
+  
+  // Normalize features using StandardScaler (matching Python's StandardScaler)
+  // scaler = StandardScaler()
+  // X_scaled = scaler.fit_transform(X)
   const means = Array.from({ length: numFeatures }, (_, i) => {
-    const values = features.map(f => f[i])
+    const values = cleanedFeatures.map(f => f[i])
     return values.reduce((a, b) => a + b, 0) / values.length
   })
   const stds = Array.from({ length: numFeatures }, (_, i) => {
-    const values = features.map(f => f[i])
+    const values = cleanedFeatures.map(f => f[i])
     const mean = means[i]
     const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length
     return Math.sqrt(variance)
   })
   
-  const normalized = features.map(f => f.map((v, i) => stds[i] !== 0 ? (v - means[i]) / stds[i] : 0))
+  const normalized = cleanedFeatures.map(f => f.map((v, i) => stds[i] !== 0 ? (v - means[i]) / stds[i] : 0))
   
-  // Perform K-Means clustering
-  const clusters = kMeans(normalized, 2, 10)
+  // Perform K-Means clustering (matching Python: n_clusters=2, random_state=42, n_init=10, max_iter=300)
+  const clusters = kMeans(normalized, 2, 300)
   
-  // Assign cluster labels
+  // Assign temporary cluster numbers
   profiles.forEach((p, i) => {
     p.clusterLabel = clusters[i] === 0 ? 'Stable Urbanizers' : 'Volatile Urbanizers'
   })
   
-  // Determine which cluster is "Stable" (lower overall score = better peace)
+  // Determine which cluster is "Stable" based on GPI (overall score) + Gini coefficient
+  // Python logic:
+  // - Lower GPI score = more peaceful
+  // - Lower Gini = more equal
+  // - If cluster has BOTH lower GPI AND lower Gini → "Urbanized/Rich/Stable"
   const cluster0Profiles = profiles.filter(p => p.clusterLabel === 'Stable Urbanizers')
   const cluster1Profiles = profiles.filter(p => p.clusterLabel === 'Volatile Urbanizers')
   
-  const cluster0Score = cluster0Profiles.reduce((sum, p) => sum + p.overallScore, 0) / cluster0Profiles.length
-  const cluster1Score = cluster1Profiles.reduce((sum, p) => sum + p.overallScore, 0) / cluster1Profiles.length
+  const cluster0GPI = cluster0Profiles.reduce((sum, p) => sum + (p.overallScore || 0), 0) / cluster0Profiles.length
+  const cluster1GPI = cluster1Profiles.reduce((sum, p) => sum + (p.overallScore || 0), 0) / cluster1Profiles.length
+  const cluster0Gini = cluster0Profiles.reduce((sum, p) => sum + (p.giniCoefficient || 0), 0) / cluster0Profiles.length
+  const cluster1Gini = cluster1Profiles.reduce((sum, p) => sum + (p.giniCoefficient || 0), 0) / cluster1Profiles.length
   
-  // Flip if needed
-  if (cluster0Score > cluster1Score) {
+  // If cluster 0 has both lower GPI and lower Gini, it's the stable cluster
+  // Otherwise, cluster 1 is the stable cluster
+  const cluster0IsStable = cluster0GPI < cluster1GPI && cluster0Gini < cluster1Gini
+  
+  console.log(`Cluster 0: GPI=${cluster0GPI.toFixed(2)}, Gini=${cluster0Gini.toFixed(2)}, Count=${cluster0Profiles.length}`)
+  console.log(`Cluster 1: GPI=${cluster1GPI.toFixed(2)}, Gini=${cluster1Gini.toFixed(2)}, Count=${cluster1Profiles.length}`)
+  console.log(`Stable cluster: ${cluster0IsStable ? 0 : 1}`)
+  
+  // Assign final labels (matching Python: "Urbanized/Rich/Stable" vs "Urbanizing/Developing/Volatile")
+  if (!cluster0IsStable) {
+    // Flip the labels
     profiles.forEach(p => {
       p.clusterLabel = p.clusterLabel === 'Stable Urbanizers' ? 'Volatile Urbanizers' : 'Stable Urbanizers'
     })
@@ -313,4 +310,3 @@ export function clusterCountries(data: DataRecord[]): Map<string, CountryProfile
   
   return result
 }
-
